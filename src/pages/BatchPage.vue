@@ -30,7 +30,10 @@
           批量生成
         </el-button>
         <el-button type="text" class="example-btn" @click="drawerVisible = true">
-          查看测试例子
+          测试例子
+        </el-button>
+        <el-button type="text" class="example-btn" @click="sourceDialogVisible = true">
+          来源图示
         </el-button>
       </div>
 
@@ -62,6 +65,7 @@
                   v-for="item in floor.items"
                   :key="item.nfcNo"
                   class="qr-card"
+                  @click="previewQR(item)"
                 >
                   <div class="qr-label">{{ item.name }}</div>
                   <div :id="'qr-' + batchKey + '-' + item.globalIdx" class="qr-container"></div>
@@ -71,7 +75,7 @@
                     size="mini"
                     plain
                     class="copy-btn"
-                    @click="copyUrl(item.fullUrl)"
+                    @click.stop="copyUrl(item.fullUrl)"
                   >
                     复制链接
                   </el-button>
@@ -102,6 +106,40 @@
         </el-button>
       </div>
     </el-drawer>
+
+    <el-dialog
+      :visible.sync="dialogVisible"
+      width="400px"
+      top="8vh"
+      :close-on-click-modal="true"
+    >
+      <div class="qr-preview-body" v-if="dialogItem">
+        <div class="qr-preview-label">{{ dialogItem.name }}</div>
+        <div class="qr-preview-container" ref="qrPreviewContainer"></div>
+        <div class="qr-preview-url">{{ dialogItem.fullUrl }}</div>
+        <div class="qr-preview-meta" v-if="dialogItem.nfcNo">NFC: {{ dialogItem.nfcNo }}</div>
+        <el-button
+          type="primary"
+          class="qr-preview-copy"
+          @click="copyUrl(dialogItem.fullUrl)"
+          plain
+        >
+          复制链接
+        </el-button>
+      </div>
+    </el-dialog>
+
+    <el-dialog
+      title="数据来源图示"
+      :visible.sync="sourceDialogVisible"
+      width="80vw"
+      top="5vh"
+      :close-on-click-modal="true"
+    >
+      <div class="source-img-wrapper">
+        <img :src="baseUrl + 'data-source.png'" alt="数据来源图示" class="source-img" />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -3427,8 +3465,34 @@ export default {
       batchKey: 0,
       activeTab: '0',
       drawerVisible: false,
+      dialogVisible: false,
+      dialogItem: null,
+      sourceDialogVisible: false,
       sampleJSON: SAMPLE_JSON,
     }
+  },
+  computed: {
+    baseUrl() {
+      return import.meta.env.BASE_URL || '/'
+    },
+  },
+  watch: {
+    dialogVisible(val) {
+      if (!val || !this.dialogItem) return
+      this.$nextTick(() => {
+        const el = this.$refs.qrPreviewContainer
+        if (!el) return
+        el.innerHTML = ''
+        new QRCode(el, {
+          text: this.dialogItem.fullUrl,
+          width: 280,
+          height: 280,
+          colorDark: '#1a1a1a',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.H,
+        })
+      })
+    },
   },
   methods: {
     generate() {
@@ -3509,9 +3573,17 @@ export default {
     },
 
     copySampleJSON() {
-      navigator.clipboard.writeText(this.sampleJSON).then(() => {
-        this.$message({ message: 'JSON 已复制', type: 'success', duration: 1200 })
+      navigator.clipboard.writeText(this.sampleJSON)
+      this.jsonInput = this.sampleJSON
+      this.$message({ message: 'JSON 已复制并填入', type: 'success', duration: 1200 })
+      this.$nextTick(() => {
+        this.generate()
       })
+    },
+
+    previewQR(item) {
+      this.dialogItem = item
+      this.dialogVisible = true
     },
 
     onTabClick() {
@@ -3694,6 +3766,72 @@ export default {
   }
 }
 
+.qr-preview-body {
+  text-align: center;
+  padding: 10px 0;
+
+  .qr-preview-label {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin-bottom: 20px;
+  }
+
+  .qr-preview-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 280px;
+
+    :deep(img) {
+      border-radius: 8px;
+    }
+  }
+
+  .qr-preview-url {
+    font-size: 12px;
+    color: #999;
+    margin-top: 16px;
+    word-break: break-all;
+  }
+
+  .qr-preview-meta {
+    font-size: 12px;
+    color: #409eff;
+    font-family: monospace;
+    margin-top: 6px;
+  }
+
+  .qr-preview-copy {
+    margin-top: 16px;
+    width: 200px;
+  }
+}
+
+.source-img-wrapper {
+  text-align: center;
+
+  .source-img {
+    max-width: 100%;
+    border-radius: 8px;
+  }
+}
+
+:deep(.el-dialog__wrapper) {
+  .el-dialog__header {
+    display: none;
+  }
+
+  .el-dialog__body {
+    background: #fff;
+    border-radius: 8px;
+  }
+}
+
+:deep(.v-modal) {
+  opacity: 0.55;
+}
+
 .floor {
   margin-bottom: 20px;
   padding-left: 16px;
@@ -3715,6 +3853,9 @@ export default {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   gap: 30px;
+  padding: 20px;
+  border: 1px solid #eee;
+  border-radius: 8px;
 }
 
 .qr-card {
@@ -3725,7 +3866,13 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
+  cursor: pointer;
   gap: 6px;
+  transition: border-color 0.2s;
+
+  &:hover {
+    border-color: #409eff;
+  }
 
   .qr-label {
     font-size: 14px;
