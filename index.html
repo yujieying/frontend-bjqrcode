@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Code 生成器</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      display: flex; justify-content: center; align-items: center;
+      min-height: 100vh; background: #f0f2f5;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .container {
+      background: #fff; border-radius: 16px; padding: 40px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.08); text-align: center;
+      width: 94%; max-width: 640px;
+    }
+    h1 { font-size: 22px; color: #1a1a1a; margin-bottom: 24px; }
+    input {
+      width: 100%; padding: 10px 18px; border: 2px solid #e0e0e0;
+      border-radius: 12px; font-size: 18px; outline: none; transition: border .2s; font-family: monospace;
+    }
+    input:focus { border-color: #4f7cff; }
+    input::placeholder { color: #aaa; }
+    .url-display {
+      display: flex; align-items: stretch; gap: 0; margin-bottom: 8px;
+      background: #f5f6f8; border-radius: 12px; border: 2px solid #e0e0e0;
+      font-size: 14px; overflow: hidden;
+    }
+    .url-display select {
+      padding: 10px 12px; border: none; background: #eef0f5; outline: none;
+      font-size: 13px; font-family: monospace; color: #333; cursor: pointer;
+      flex-shrink: 0; max-width: 140px;
+      border-right: 2px solid #e0e0e0;
+    }
+    .url-display input {
+      flex: 1; border: none !important; border-radius: 0 !important;
+      padding: 10px 14px; font-size: 18px; outline: none;
+      font-family: monospace; background: transparent;
+    }
+    .url-display input:focus { border-color: transparent !important; }
+    .copy-link {
+      margin-top: 6px; font-size: 12px; color: #bbb; cursor: pointer;
+      transition: color .15s; display: none;
+    }
+    .copy-link:hover { color: #4f7cff; }
+    button {
+      width: 100%; padding: 12px; margin-top: 12px;
+      background: #4f7cff; color: #fff; border: none; border-radius: 10px;
+      font-size: 16px; font-weight: 600; cursor: pointer; transition: background .2s;
+    }
+    button:hover { background: #3b64e0; }
+    .qr-wrapper {
+      margin-top: 28px; min-height: 180px;
+      display: flex; justify-content: center; align-items: center;
+    }
+    .qr-wrapper img { border-radius: 8px; }
+    .hint { color: #999; font-size: 14px; margin-top: 16px; }
+    .error { color: #e74c3c; font-size: 14px; margin-top: 8px; display: none; }
+    .history { margin-top: 28px; text-align: left; }
+    .history-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 12px; }
+    .history-title { font-size: 14px; color: #999; white-space: nowrap; }
+    .history-clear {
+      font-size: 11px; color: #ccc; cursor: pointer; border: 1px solid #eee;
+      background: none; padding: 1px 8px; border-radius: 4px;
+      transition: all .15s; white-space: nowrap; flex-shrink: 0;
+    }
+    .history-clear:hover { border-color: #ef4444; color: #ef4444; }
+    .history-list { display: flex; flex-direction: column; gap: 4px; }
+    .history-item {
+      padding: 8px 14px; background: #f5f6f8; border-radius: 8px;
+      font-size: 14px; color: #333; cursor: pointer; transition: background .15s;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .history-item:hover { background: #e8ebf5; }
+    .history-item-id { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; font-family: monospace; }
+    .history-del {
+      flex-shrink: 0; width: 24px; height: 24px; border-radius: 6px;
+      border: none; background: transparent; color: #ccc; cursor: pointer;
+      font-size: 16px; line-height: 24px; text-align: center; padding: 0;
+      transition: all .15s;
+    }
+    .history-del:hover { background: #fee2e2; color: #ef4444; }
+    .history-empty { color: #ccc; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>QR Code 生成器</h1>
+    <div class="url-display">
+      <select id="prefixSelect">
+        <option value="https://fhh-sit.bgyfw.com/space-h5/?ID=" selected>fhh-sit</option>
+        <option value="https://fhh.bgyfw.com/space-h5/?ID=">fhh</option>
+      </select>
+      <input type="text" id="urlInput" placeholder="输入 ID" autofocus />
+    </div>
+    <button id="generateBtn">生成二维码</button>
+    <div class="copy-link" id="copyLink">复制链接</div>
+    <div class="qr-wrapper" id="qrWrapper"></div>
+    <div class="error" id="errorMsg">请输入 ID</div>
+    <div class="hint">输入 ID 后点击按钮生成二维码</div>
+    <div class="history" id="history">
+      <div class="history-header">
+        <div class="history-title">历史记录</div>
+        <button class="history-clear" id="clearAllBtn">清空</button>
+      </div>
+      <div class="history-list" id="historyList"></div>
+    </div>
+  </div>
+
+  <script>
+    let qrCode = null;
+    const HISTORY_KEY = 'qrcode_history';
+    const MAX_HISTORY = 20;
+
+    function getPrefix() {
+      return document.getElementById('prefixSelect').value;
+    }
+
+    function normalizeItem(item) {
+      if (typeof item === 'string') return { url: item, note: '' };
+      return { url: item.url || '', note: item.note || '' };
+    }
+
+    function getHistory() {
+      try {
+        const data = JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+        return data.map(normalizeItem);
+      }
+      catch { return []; }
+    }
+
+    function saveHistoryItem(url, note) {
+      let list = getHistory().filter(item => item.url !== url);
+      list.unshift({ url, note: note || '' });
+      if (list.length > MAX_HISTORY) list = list.slice(0, MAX_HISTORY);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+      return list;
+    }
+
+    function extractId(url) {
+      // 去掉固定前缀，直接取后面的 ID
+      const prefixes = [
+        'https://fhh-sit.bgyfw.com/space-h5/?ID=',
+        'https://fhh.bgyfw.com/space-h5/?ID='
+      ];
+      for (const p of prefixes) {
+        if (url.startsWith(p)) return url.slice(p.length);
+      }
+      try {
+        const u = new URL(url);
+        for (const key of ['ID', 'id', 'variant', 'product_id', 'sku']) {
+          const val = u.searchParams.get(key);
+          if (val) return val;
+        }
+        const segs = u.pathname.replace(/\/$/, '').split('/').filter(Boolean);
+        if (segs.length === 0) return '';
+        const long = segs.filter(s => s.length > 12 || /[A-Z0-9]{4,}/.test(s));
+        return long.length > 0 ? long[long.length - 1] : segs[segs.length - 1];
+      } catch { return ''; }
+    }
+
+    function deleteHistoryItem(url) {
+      let list = getHistory().filter(item => item.url !== url);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+      renderHistory(list);
+    }
+
+    function renderHistory(list) {
+      const el = document.getElementById('historyList');
+      if (!list || list.length === 0) {
+        el.innerHTML = '<span class="history-empty">暂无记录</span>';
+        return;
+      }
+      el.innerHTML = list.map(item => {
+        const url = item.url.replace(/"/g, '&quot;');
+        const id = extractId(item.url) || item.url;
+        const displayId = escapeHtml(id);
+        return `<div class="history-item" data-url="${url}" data-id="${displayId.replace(/"/g, '&quot;')}">
+          <span class="history-item-id">${id}</span>
+          <button class="history-del" title="删除">×</button>
+        </div>`;
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    function generate() {
+      const input = document.getElementById('urlInput');
+      const id = input.value.trim();
+      const errorEl = document.getElementById('errorMsg');
+      const wrapper = document.getElementById('qrWrapper');
+
+      if (!id) {
+        errorEl.style.display = 'block';
+        return;
+      }
+      errorEl.style.display = 'none';
+
+      const fullUrl = getPrefix() + id;
+
+      wrapper.innerHTML = '';
+      qrCode = new QRCode(wrapper, {
+        text: fullUrl,
+        width: 180,
+        height: 180,
+        colorDark: '#1a1a1a',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H,
+      });
+
+      const existing = getHistory().find(i => i.url === fullUrl);
+      const note = existing ? existing.note : id;
+      const list = saveHistoryItem(fullUrl, note);
+      renderHistory(list);
+    }
+
+    document.getElementById('generateBtn').addEventListener('click', generate);
+    document.getElementById('urlInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') generate();
+    });
+    function updateCopyLink() {
+      const id = document.getElementById('urlInput').value.trim();
+      const el = document.getElementById('copyLink');
+      el.style.display = id ? 'block' : 'none';
+    }
+
+    document.getElementById('urlInput').addEventListener('input', updateCopyLink);
+    document.getElementById('prefixSelect').addEventListener('change', updateCopyLink);
+    document.getElementById('copyLink').addEventListener('click', function() {
+      const id = document.getElementById('urlInput').value.trim();
+      if (!id) return;
+      const url = getPrefix() + id;
+      navigator.clipboard.writeText(url).then(() => {
+        const el = document.getElementById('copyLink');
+        el.textContent = '已复制';
+        setTimeout(() => { el.textContent = '复制链接'; }, 1200);
+      });
+    });
+    document.getElementById('historyList').addEventListener('click', e => {
+      const delBtn = e.target.closest('.history-del');
+      if (delBtn) {
+        const item = delBtn.closest('.history-item');
+        deleteHistoryItem(item.dataset.url);
+        return;
+      }
+      const item = e.target.closest('.history-item');
+      if (!item) return;
+      document.getElementById('urlInput').value = item.dataset.id;
+      generate();
+    });
+    document.getElementById('clearAllBtn').addEventListener('click', function() {
+      if (getHistory().length === 0) return;
+      if (confirm('确定清空所有历史记录？')) {
+        localStorage.removeItem(HISTORY_KEY);
+        renderHistory([]);
+      }
+    });
+
+    renderHistory(getHistory());
+  </script>
+</body>
+</html>
