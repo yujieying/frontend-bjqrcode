@@ -60,6 +60,7 @@
           @click="selectHistory(item)"
         >
           <span class="history-item-id">{{ extractId(item.url) || item.url }}</span>
+          <span class="history-tag" :class="item.tag === '生产' ? 'tag-prod' : 'tag-test'">{{ item.tag || '测试' }}</span>
           <el-button
             size="mini"
             type="text"
@@ -87,8 +88,8 @@ const HISTORY_KEY = 'qrcode_history'
 const MAX_HISTORY = 20
 
 function normalizeItem(item) {
-  if (typeof item === 'string') return { url: item, note: '' }
-  return { url: item.url || '', note: item.note || '' }
+  if (typeof item === 'string') return { url: item, note: '', tag: '' }
+  return { url: item.url || '', note: item.note || '', tag: item.tag || '' }
 }
 
 export default {
@@ -125,9 +126,9 @@ export default {
       }
     },
 
-    saveHistoryItem(url, note) {
+    saveHistoryItem(url, note, tag) {
       let list = this.getHistory().filter(item => item.url !== url)
-      list.unshift({ url, note: note || '' })
+      list.unshift({ url, note: note || '', tag: tag || '' })
       if (list.length > MAX_HISTORY) list = list.slice(0, MAX_HISTORY)
       localStorage.setItem(HISTORY_KEY, JSON.stringify(list))
       return list
@@ -157,7 +158,8 @@ export default {
 
       const existing = this.history.find(i => i.url === fullUrl)
       const note = existing ? existing.note : id
-      this.history = this.saveHistoryItem(fullUrl, note)
+      const tag = this.prefix === 'https://fhh-sit.bgyfw.com/space-h5/?ID=' ? '测试' : '生产'
+      this.history = this.saveHistoryItem(fullUrl, note, tag)
     },
 
     copyLink() {
@@ -360,6 +362,26 @@ h1 {
         white-space: nowrap;
         font-weight: 500;
         font-family: monospace;
+      }
+
+      .history-tag {
+        flex-shrink: 0;
+        font-size: 10px;
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-weight: 500;
+        line-height: 1.6;
+        margin-right: 4px;
+      }
+
+      .tag-test {
+        color: #409eff;
+        background: #ecf5ff;
+      }
+
+      .tag-prod {
+        color: #e6a23c;
+        background: #fdf6ec;
       }
 
       .history-del {

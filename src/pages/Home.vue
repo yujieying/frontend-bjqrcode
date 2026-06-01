@@ -29,7 +29,7 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 80vh;
+  min-height: 100vh;
 }
 
 .home-card {
@@ -40,6 +40,7 @@ export default {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   // max-width: 480px;
   width: 100%;
+  min-height: calc(100vh - 80px);
 }
 
 .logo {

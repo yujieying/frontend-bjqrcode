@@ -10,6 +10,7 @@
     "deploy:docs": "npm run build && rm -rf docs && cp -r dist docs && touch docs/.nojekyll"
   },
   "dependencies": {
+    "docs": "^0.3.2-canary.0",
     "element-ui": "^2.15.14",
     "qrcodejs2-fixes": "^0.0.2",
     "vue": "^2.7.16",
